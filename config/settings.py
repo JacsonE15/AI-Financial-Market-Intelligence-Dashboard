@@ -1,8 +1,11 @@
 """
-Central configuration loaded from environment variables.
+Central configuration loaded from environment variables and Streamlit secrets.
 
-API keys should live in a local `.env` file (see `.env.example`).
-Yahoo Finance does not require a key for Phase 1 market data.
+Priority for each setting:
+1. Streamlit Cloud secrets (`st.secrets`) when running on Streamlit
+2. Environment variables / local `.env` file
+
+Never commit real API keys. Use `.env` locally and Streamlit Secrets in Cloud.
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -18,6 +22,25 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 
 load_dotenv(PROJECT_ROOT / ".env")
+
+
+def _secret_or_env(name: str, default: str = "") -> str:
+    """
+    Read a config value from Streamlit secrets first, then environment variables.
+    """
+    try:
+        import streamlit as st
+
+        # st.secrets behaves like a mapping on Cloud / with secrets.toml
+        if name in st.secrets:
+            value: Any = st.secrets[name]
+            if value is not None and str(value).strip():
+                return str(value).strip()
+    except Exception:
+        # Local scripts, missing secrets file, or pre-Streamlit import path
+        pass
+
+    return os.getenv(name, default)
 
 
 # Canonical Yahoo Finance tickers for the Global Market Overview.
@@ -58,33 +81,33 @@ class Settings:
     project_root: Path = PROJECT_ROOT
     data_dir: Path = DATA_DIR
     database_url: str = field(
-        default_factory=lambda: os.getenv(
+        default_factory=lambda: _secret_or_env(
             "DATABASE_URL", f"sqlite:///{DATA_DIR / 'market_intelligence.db'}"
         )
     )
     default_lookback_days: int = field(
-        default_factory=lambda: int(os.getenv("DEFAULT_LOOKBACK_DAYS", "90"))
+        default_factory=lambda: int(_secret_or_env("DEFAULT_LOOKBACK_DAYS", "90"))
     )
-    log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
+    log_level: str = field(default_factory=lambda: _secret_or_env("LOG_LEVEL", "INFO"))
     force_demo_data: bool = field(
-        default_factory=lambda: os.getenv("FORCE_DEMO_DATA", "").lower()
+        default_factory=lambda: _secret_or_env("FORCE_DEMO_DATA", "").lower()
         in {"1", "true", "yes"}
     )
 
-    # External APIs (Phase 2+)
-    fred_api_key: str = field(default_factory=lambda: os.getenv("FRED_API_KEY", ""))
-    news_api_key: str = field(default_factory=lambda: os.getenv("NEWS_API_KEY", ""))
-    finnhub_api_key: str = field(default_factory=lambda: os.getenv("FINNHUB_API_KEY", ""))
+    # External APIs
+    fred_api_key: str = field(default_factory=lambda: _secret_or_env("FRED_API_KEY", ""))
+    news_api_key: str = field(default_factory=lambda: _secret_or_env("NEWS_API_KEY", ""))
+    finnhub_api_key: str = field(default_factory=lambda: _secret_or_env("FINNHUB_API_KEY", ""))
     alpha_vantage_api_key: str = field(
-        default_factory=lambda: os.getenv("ALPHA_VANTAGE_API_KEY", "")
+        default_factory=lambda: _secret_or_env("ALPHA_VANTAGE_API_KEY", "")
     )
-    qwen_api_key: str = field(default_factory=lambda: os.getenv("QWEN_API_KEY", ""))
+    qwen_api_key: str = field(default_factory=lambda: _secret_or_env("QWEN_API_KEY", ""))
     qwen_api_base: str = field(
-        default_factory=lambda: os.getenv(
+        default_factory=lambda: _secret_or_env(
             "QWEN_API_BASE", "https://dashscope.aliyuncs.com/compatible-mode/v1"
         )
     )
-    qwen_model: str = field(default_factory=lambda: os.getenv("QWEN_MODEL", "qwen-turbo"))
+    qwen_model: str = field(default_factory=lambda: _secret_or_env("QWEN_MODEL", "qwen-turbo"))
 
     market_tickers: dict[str, str] = field(default_factory=lambda: dict(GLOBAL_MARKET_TICKERS))
     default_watchlist: list[str] = field(default_factory=lambda: list(DEFAULT_WATCHLIST))

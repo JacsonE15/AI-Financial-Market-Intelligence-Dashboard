@@ -1,0 +1,6 @@
+# Optional Streamlit server defaults for local + Cloud.
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

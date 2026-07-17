@@ -36,6 +36,8 @@ reports/*.pptx
 
 # Streamlit
 .streamlit/secrets.toml
+# Keep shared non-secret config commit-able:
+# .streamlit/config.toml
 
 # Testing / coverage
 .pytest_cache/

@@ -75,4 +75,34 @@ See the in-app placeholder tabs and the notes at the end of this README (also su
 
 ## Environment variables
 
-Copy `.env.example` → `.env`. Yahoo Finance works with empty keys. Add FRED / News / Qwen keys when enabling later phases.
+Copy `.env.example` → `.env` for local development. Yahoo Finance works with empty keys.
+
+## Deploy on Streamlit Cloud
+
+1. Go to [share.streamlit.io](https://share.streamlit.io) and create a new app.
+2. Repository: `JacsonE15/AI-Financial-Market-Intelligence-Dashboard`
+3. Branch: `main`
+4. Main file path: `app.py`
+5. In **Advanced settings → Secrets**, paste (use your real keys; never commit them):
+
+```toml
+FRED_API_KEY = "your-fred-key"
+NEWS_API_KEY = "your-newsapi-key"
+```
+
+Optional secrets:
+
+```toml
+FINNHUB_API_KEY = ""
+QWEN_API_KEY = ""
+QWEN_API_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+QWEN_MODEL = "qwen-turbo"
+FORCE_DEMO_DATA = "false"
+```
+
+6. Click **Deploy**.
+
+Notes:
+- Config reads **Streamlit Secrets first**, then `.env` / environment variables.
+- SQLite under `data/` is ephemeral on Cloud (fine for cache/watchlist; resets on reboot).
+- Without API keys the app still runs using demo / rule-based fallbacks.
