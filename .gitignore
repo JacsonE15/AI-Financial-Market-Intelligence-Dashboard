@@ -1,0 +1,46 @@
+# Environment & secrets
+.env
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Data / local DB
+data/*.db
+*.sqlite
+*.sqlite3
+.cache/
+
+# Logs & outputs
+logs/
+*.log
+outputs/
+reports/*.pdf
+reports/*.pptx
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
