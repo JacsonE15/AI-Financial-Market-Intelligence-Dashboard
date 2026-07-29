@@ -171,7 +171,10 @@ def _demo_news(limit: int = 20) -> pd.DataFrame:
 
 
 def _fetch_newsapi(query: str, limit: int) -> list[dict[str, Any]]:
-    if not settings.news_api_key:
+    from config.settings import _secret_or_env
+
+    api_key = _secret_or_env("NEWS_API_KEY")
+    if not api_key:
         return []
     url = "https://newsapi.org/v2/everything"
     params = {
@@ -179,7 +182,7 @@ def _fetch_newsapi(query: str, limit: int) -> list[dict[str, Any]]:
         "language": "en",
         "sortBy": "publishedAt",
         "pageSize": min(limit, 50),
-        "apiKey": settings.news_api_key,
+        "apiKey": api_key,
     }
     resp = requests.get(url, params=params, timeout=20)
     resp.raise_for_status()
@@ -199,7 +202,10 @@ def _fetch_newsapi(query: str, limit: int) -> list[dict[str, Any]]:
 
 
 def _fetch_finnhub(query: str, limit: int) -> list[dict[str, Any]]:
-    if not settings.finnhub_api_key:
+    from config.settings import _secret_or_env
+
+    api_key = _secret_or_env("FINNHUB_API_KEY")
+    if not api_key:
         return []
     # Company news endpoint works best with a symbol; fall back to general market news.
     symbol = query.upper() if re.fullmatch(r"[A-Z]{1,5}", query.upper()) else None
@@ -210,11 +216,11 @@ def _fetch_finnhub(query: str, limit: int) -> list[dict[str, Any]]:
             "symbol": symbol,
             "from": (today - timedelta(days=7)).isoformat(),
             "to": today.isoformat(),
-            "token": settings.finnhub_api_key,
+            "token": api_key,
         }
     else:
         url = "https://finnhub.io/api/v1/news"
-        params = {"category": "general", "token": settings.finnhub_api_key}
+        params = {"category": "general", "token": api_key}
 
     resp = requests.get(url, params=params, timeout=20)
     resp.raise_for_status()
@@ -280,10 +286,14 @@ def fetch_financial_news(
     error = ""
 
     try:
-        if settings.news_api_key:
+        from config.settings import _secret_or_env
+
+        news_key = _secret_or_env("NEWS_API_KEY")
+        finnhub_key = _secret_or_env("FINNHUB_API_KEY")
+        if news_key:
             raw = _fetch_newsapi(query, limit)
             source = "newsapi"
-        elif settings.finnhub_api_key:
+        elif finnhub_key:
             raw = _fetch_finnhub(query, limit)
             source = "finnhub"
         else:
@@ -295,7 +305,9 @@ def fetch_financial_news(
         source = "demo"
 
     if not raw:
-        if settings.news_api_key and not error:
+        from config.settings import _secret_or_env
+
+        if _secret_or_env("NEWS_API_KEY") and not error:
             error = (
                 "NewsAPI returned no articles. Free developer keys often block "
                 "cloud-server requests — try Finnhub or run locally."

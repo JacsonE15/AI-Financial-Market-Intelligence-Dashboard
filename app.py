@@ -25,13 +25,9 @@ def _hydrate_env_from_streamlit_secrets() -> None:
     This makes Cloud Secrets work even for code paths that only call os.getenv().
     """
     try:
-        for key in st.secrets:
-            value = st.secrets.get(key)
-            if value is None or isinstance(value, (dict, list)):
-                continue
-            text = str(value).strip()
-            if text:
-                os.environ[str(key)] = text
+        from config.settings import hydrate_env_from_streamlit_secrets
+
+        hydrate_env_from_streamlit_secrets()
     except Exception:
         # Local runs without secrets.toml are fine.
         pass
@@ -39,7 +35,7 @@ def _hydrate_env_from_streamlit_secrets() -> None:
 
 _hydrate_env_from_streamlit_secrets()
 
-from config.settings import settings
+from config.settings import hydrate_env_from_streamlit_secrets, reload_settings, settings
 from database.connection import init_db
 from views.equity_watchlist import render_equity_watchlist
 from views.global_markets import render_global_market_overview
@@ -95,6 +91,10 @@ def main() -> None:
     _apply_page_config()
     _inject_styles()
 
+    # Re-read Cloud Secrets on every run so newly saved keys are picked up.
+    key_status = hydrate_env_from_streamlit_secrets()
+    runtime_settings = reload_settings()
+
     try:
         init_db()
     except Exception as exc:
@@ -113,17 +113,31 @@ def main() -> None:
         st.header("Desk Controls")
         st.write("All five tabs are active: markets, equities, risk, news, and AI brief.")
         st.divider()
-        st.caption(f"Lookback default: {settings.default_lookback_days} days")
-        st.caption(f"DB: `{settings.database_url}`")
-        if settings.qwen_api_key:
+        st.markdown("##### API key status")
+        st.caption("Shows whether Cloud Secrets / env were detected (values never displayed).")
+        st.write(
+            f"- FRED: `{'yes' if key_status.get('FRED_API_KEY') else 'no'}`  \n"
+            f"- NEWS_API_KEY: `{'yes' if key_status.get('NEWS_API_KEY') else 'no'}`  \n"
+            f"- FINNHUB: `{'yes' if key_status.get('FINNHUB_API_KEY') else 'no'}`  \n"
+            f"- Qwen: `{'yes' if key_status.get('QWEN_API_KEY') else 'no'}`"
+        )
+        if not key_status.get("NEWS_API_KEY") and not key_status.get("FINNHUB_API_KEY"):
+            st.error(
+                "News key not detected on THIS app. "
+                "Open Manage app → ⋮ → Settings → Secrets and paste top-level TOML, then Save + Reboot."
+            )
+        st.divider()
+        st.caption(f"Lookback default: {runtime_settings.default_lookback_days} days")
+        st.caption(f"DB: `{runtime_settings.database_url}`")
+        if runtime_settings.qwen_api_key:
             st.success("Qwen API key detected")
         else:
             st.info("No LLM key — rule-based summaries/reports")
-        if settings.news_api_key or settings.finnhub_api_key:
+        if runtime_settings.news_api_key or runtime_settings.finnhub_api_key:
             st.success("News API configured")
         else:
             st.caption("News: demo headlines (add API key for live)")
-        if settings.fred_api_key:
+        if runtime_settings.fred_api_key:
             st.success("FRED API configured")
         else:
             st.caption("Macro: demo FRED snapshot")

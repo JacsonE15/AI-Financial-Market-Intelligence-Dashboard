@@ -23,24 +23,84 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+# Keys we expect from Streamlit Cloud Secrets / .env
+SECRET_KEYS: tuple[str, ...] = (
+    "FRED_API_KEY",
+    "NEWS_API_KEY",
+    "FINNHUB_API_KEY",
+    "ALPHA_VANTAGE_API_KEY",
+    "QWEN_API_KEY",
+    "QWEN_API_BASE",
+    "QWEN_MODEL",
+    "DATABASE_URL",
+    "DEFAULT_LOOKBACK_DAYS",
+    "LOG_LEVEL",
+    "FORCE_DEMO_DATA",
+)
+
+
+def _read_from_streamlit_secrets(name: str) -> str | None:
+    """Best-effort read of one secret from st.secrets (top-level or nested)."""
+    try:
+        import streamlit as st
+
+        # Top-level: NEWS_API_KEY = "..."
+        try:
+            value = st.secrets[name]
+            if value is not None and not isinstance(value, (dict, list)):
+                text = str(value).strip()
+                if text:
+                    return text
+        except Exception:
+            pass
+
+        # Nested common patterns: [api] NEWS_API_KEY = "..."
+        try:
+            for section in st.secrets.values():
+                if isinstance(section, dict) and name in section:
+                    text = str(section[name]).strip()
+                    if text:
+                        return text
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return None
+
 
 def _secret_or_env(name: str, default: str = "") -> str:
     """
     Read a config value from Streamlit secrets first, then environment variables.
+
+    Called at runtime (not only at import) so Cloud Secrets work after reboot.
     """
-    try:
-        import streamlit as st
-
-        # st.secrets behaves like a mapping on Cloud / with secrets.toml
-        if name in st.secrets:
-            value: Any = st.secrets[name]
-            if value is not None and str(value).strip():
-                return str(value).strip()
-    except Exception:
-        # Local scripts, missing secrets file, or pre-Streamlit import path
-        pass
-
+    secret = _read_from_streamlit_secrets(name)
+    if secret:
+        return secret
     return os.getenv(name, default)
+
+
+def hydrate_env_from_streamlit_secrets() -> dict[str, bool]:
+    """
+    Copy known secrets into os.environ. Returns which keys were found (True/False only).
+    """
+    found = {key: False for key in SECRET_KEYS}
+    for key in SECRET_KEYS:
+        value = _read_from_streamlit_secrets(key)
+        if value:
+            os.environ[key] = value
+            found[key] = True
+        elif os.getenv(key):
+            found[key] = True
+    return found
+
+
+def reload_settings() -> "Settings":
+    """Rebuild settings after secrets hydration (avoids stale import-time singleton)."""
+    global settings
+    settings = Settings()
+    settings.ensure_directories()
+    return settings
 
 
 # Canonical Yahoo Finance tickers for the Global Market Overview.
