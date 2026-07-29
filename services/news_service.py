@@ -266,14 +266,18 @@ def _enrich(raw_rows: list[dict[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def fetch_financial_news(query: str = "stock market OR federal reserve OR earnings", limit: int = 25) -> tuple[pd.DataFrame, str]:
+def fetch_financial_news(
+    query: str = "stock market OR federal reserve OR earnings",
+    limit: int = 25,
+) -> tuple[pd.DataFrame, str, str]:
     """
     Collect and enrich financial news.
 
-    Returns (dataframe, source_label).
+    Returns (dataframe, source_label, error_message).
     """
     raw: list[dict[str, Any]] = []
     source = "demo"
+    error = ""
 
     try:
         if settings.news_api_key:
@@ -282,17 +286,26 @@ def fetch_financial_news(query: str = "stock market OR federal reserve OR earnin
         elif settings.finnhub_api_key:
             raw = _fetch_finnhub(query, limit)
             source = "finnhub"
+        else:
+            error = "No NEWS_API_KEY or FINNHUB_API_KEY found in environment / Streamlit Secrets."
     except Exception as exc:
         logger.warning("Live news fetch failed: %s", exc)
+        error = str(exc)
         raw = []
+        source = "demo"
 
     if not raw:
-        return _demo_news(limit), "demo"
+        if settings.news_api_key and not error:
+            error = (
+                "NewsAPI returned no articles. Free developer keys often block "
+                "cloud-server requests — try Finnhub or run locally."
+            )
+        return _demo_news(limit), "demo", error
 
     frame = _enrich(raw)
     if frame.empty:
-        return _demo_news(limit), "demo"
-    return frame.head(limit).reset_index(drop=True), source
+        return _demo_news(limit), "demo", error or "News payload was empty after enrichment."
+    return frame.head(limit).reset_index(drop=True), source, ""
 
 
 def persist_news(news: pd.DataFrame) -> int:

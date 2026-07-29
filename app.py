@@ -7,6 +7,7 @@ AI-powered morning briefing platform for Middle Office Analysts.
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -15,6 +16,28 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+
+def _hydrate_env_from_streamlit_secrets() -> None:
+    """
+    Copy Streamlit Cloud secrets into environment variables before Settings loads.
+
+    This makes Cloud Secrets work even for code paths that only call os.getenv().
+    """
+    try:
+        for key in st.secrets:
+            value = st.secrets.get(key)
+            if value is None or isinstance(value, (dict, list)):
+                continue
+            text = str(value).strip()
+            if text:
+                os.environ[str(key)] = text
+    except Exception:
+        # Local runs without secrets.toml are fine.
+        pass
+
+
+_hydrate_env_from_streamlit_secrets()
 
 from config.settings import settings
 from database.connection import init_db

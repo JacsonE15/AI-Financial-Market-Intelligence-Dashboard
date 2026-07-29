@@ -34,7 +34,7 @@ def _gather_morning_inputs(lookback_days: int):
     macro, macro_source = fetch_macro_snapshot()
     macro_text = macro_narrative(macro)
 
-    news, news_source = fetch_financial_news(limit=12)
+    news, news_source, _news_err = fetch_financial_news(limit=12)
 
     return {
         "markets_text": markets_text,

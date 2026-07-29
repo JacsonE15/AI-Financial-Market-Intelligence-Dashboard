@@ -41,12 +41,24 @@ def render_news_intelligence() -> None:
         _load_news.clear()
 
     with st.spinner("Fetching & scoring headlines..."):
-        news, source = _load_news(query, limit)
+        news, source, news_error = _load_news(query, limit)
 
     if source == "demo":
-        st.warning(
-            "Using **demo headlines** (set `NEWS_API_KEY` or `FINNHUB_API_KEY` in `.env` for live news)."
-        )
+        from config.settings import settings
+
+        if settings.news_api_key or settings.finnhub_api_key:
+            st.warning(
+                "API key is present, but live news failed — showing **demo headlines**.\n\n"
+                f"Details: `{news_error or 'unknown error'}`\n\n"
+                "Note: NewsAPI free developer keys often block Streamlit Cloud servers. "
+                "Add a `FINNHUB_API_KEY` in Secrets, or test news locally."
+            )
+        else:
+            st.warning(
+                "Using **demo headlines**. Cloud app still does not see your key — "
+                "confirm Secrets were saved, then Reboot the app. "
+                f"({news_error or 'no key in runtime environment'})"
+            )
     else:
         st.caption(f"News source: {source}")
 

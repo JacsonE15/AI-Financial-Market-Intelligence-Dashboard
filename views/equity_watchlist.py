@@ -17,7 +17,7 @@ from services.watchlist_store import load_watchlist, save_watchlist
 def _load_watchlist_data(tickers: tuple[str, ...], lookback_days: int):
     prices, source = fetch_ohlcv(list(tickers), lookback_days=lookback_days)
     metrics = build_watchlist_metrics(prices)
-    news, news_source = fetch_financial_news(
+    news, news_source, _news_err = fetch_financial_news(
         query=" OR ".join(tickers[:6]) if tickers else "stocks",
         limit=30,
     )
