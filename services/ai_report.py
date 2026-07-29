@@ -21,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 def generate_market_summary(performance_summary: pd.DataFrame) -> str:
     """Generate a short Global Market Overview narrative."""
-    if settings.qwen_api_key:
+    from config.settings import _secret_or_env
+
+    api_key = _secret_or_env("QWEN_API_KEY")
+    if api_key:
         try:
             return _chat(
                 system=(
@@ -32,6 +35,7 @@ def generate_market_summary(performance_summary: pd.DataFrame) -> str:
                     "Summarize the following market performance table for today's morning meeting:\n\n"
                     f"{performance_summary.to_string(index=False)}"
                 ),
+                api_key=api_key,
             )
         except Exception as exc:
             logger.warning("LLM summary failed, using rule-based fallback: %s", exc)
@@ -45,9 +49,12 @@ def generate_morning_report(context: dict[str, Any]) -> str:
 
     Expected context keys: markets, macro, equities, risk_alerts, events, as_of.
     """
-    as_of = context.get("as_of") or datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    from config.settings import _secret_or_env
 
-    if settings.qwen_api_key:
+    as_of = context.get("as_of") or datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    api_key = _secret_or_env("QWEN_API_KEY")
+
+    if api_key:
         try:
             return _chat(
                 system=(
@@ -63,6 +70,7 @@ def generate_morning_report(context: dict[str, Any]) -> str:
                     f"RISK ALERTS:\n{context.get('risk_alerts', '')}\n\n"
                     f"EVENTS / NEWS:\n{context.get('events', '')}\n"
                 ),
+                api_key=api_key,
             )
         except Exception as exc:
             logger.warning("LLM morning report failed, using template: %s", exc)
@@ -143,10 +151,21 @@ def _rule_based_morning_report(context: dict[str, Any], as_of: str) -> str:
     )
 
 
-def _chat(system: str, user: str) -> str:
+def _chat(system: str, user: str, api_key: str | None = None) -> str:
     """Call an OpenAI-compatible chat completions endpoint (Qwen / DashScope)."""
+    from config.settings import _secret_or_env
+
+    key = (api_key or _secret_or_env("QWEN_API_KEY") or "").strip()
+    if not key:
+        raise RuntimeError("QWEN_API_KEY is missing")
+
+    model = _secret_or_env("QWEN_MODEL", "qwen-turbo")
+    base = _secret_or_env(
+        "QWEN_API_BASE", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+
     payload = {
-        "model": settings.qwen_model,
+        "model": model,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -154,10 +173,10 @@ def _chat(system: str, user: str) -> str:
         "temperature": 0.3,
     }
     headers = {
-        "Authorization": f"Bearer {settings.qwen_api_key}",
+        "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
     }
-    url = settings.qwen_api_base.rstrip("/") + "/chat/completions"
+    url = base.rstrip("/") + "/chat/completions"
     response = requests.post(url, json=payload, headers=headers, timeout=60)
     response.raise_for_status()
     data = response.json()

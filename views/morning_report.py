@@ -68,8 +68,12 @@ def render_morning_report() -> None:
             _gather_morning_inputs.clear()
             st.session_state.pop("morning_report_md", None)
 
-    if settings.qwen_api_key:
-        st.success(f"LLM enabled — model `{settings.qwen_model}`")
+    from config.settings import _secret_or_env
+
+    runtime_qwen = bool(_secret_or_env("QWEN_API_KEY"))
+    model_name = _secret_or_env("QWEN_MODEL", "qwen-turbo")
+    if runtime_qwen:
+        st.success(f"LLM enabled — model `{model_name}`")
     else:
         st.info("No `QWEN_API_KEY` set — generating a structured rule-based brief (still meeting-ready).")
 
